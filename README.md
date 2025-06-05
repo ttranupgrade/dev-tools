@@ -6,7 +6,12 @@ A collection of development tools and Claude slash commands for team productivit
 
 1. Clone this repository:
    ```bash
+   # Option A: Clone the original (if you have access)
    git clone https://github.com/ttranupgrade/dev-tools.git
+   
+   # Option B: Clone your fork
+   git clone https://github.com/YOUR_USERNAME/dev-tools.git
+   
    cd dev-tools
    ```
 

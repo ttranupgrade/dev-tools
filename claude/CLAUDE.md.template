@@ -14,7 +14,7 @@ Creates a new feature flag in k8s-template project configurations.
 - Adds the feature flag to project-specific configuration files:
   - For non-prod: updates main, ondemand, stage, preprod environments
   - For prod: updates only prod environment
-- Commits changes and pushes to your configured remote (ttranupgrade or origin)
+- Commits changes and pushes to your configured remote (auto-detects your fork or uses origin)
 - Creates a pull request with detailed description
 - Restores original branch state and unstashes changes
 

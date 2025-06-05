@@ -265,12 +265,21 @@ Co-Authored-By: Claude <noreply@anthropic.com>`;
     // Step 9: Push branch and create pull request
     console.log('\n🚀 Pushing branch and creating pull request...');
     
-    // Try to find a suitable remote for pushing (prefer ttranupgrade, fallback to origin)
+    // Try to find a suitable remote for pushing (prefer user's fork, fallback to origin)
     let pushRemote = 'origin';
     try {
       const remotes = executeCommand('git remote', { silent: true }).split('\n').filter(r => r.trim());
-      if (remotes.includes('ttranupgrade')) {
-        pushRemote = 'ttranupgrade';
+      
+      // Look for remotes that might be user's fork (not 'origin' and not 'upstream')
+      const userRemotes = remotes.filter(remote => 
+        remote !== 'origin' && 
+        remote !== 'upstream' && 
+        remote !== 'push'
+      );
+      
+      if (userRemotes.length > 0) {
+        // Use the first user remote found (likely their fork)
+        pushRemote = userRemotes[0];
       }
     } catch (error) {
       // Use default origin if remote command fails
