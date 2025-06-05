@@ -256,9 +256,7 @@ async function main() {
     
     const commitMessage = `Add ${featureFlagName} feature flag for ${projectName} in ${envType} environments
 
-🤖 Generated with Claude Code
-
-Co-Authored-By: Claude <noreply@anthropic.com>`;
+🤖 Generated with Claude Code`;
     
     executeCommand(`git commit -m "${commitMessage}"`);
 
