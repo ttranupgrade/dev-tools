@@ -1,0 +1,21 @@
+# Claude Slash Commands
+
+## /feature-flag
+Creates a new feature flag in k8s-template project configurations.
+
+**Usage:** `/feature-flag`
+
+**What it does:**
+- Prompts for feature flag name, project name, and environment type (prod/non-prod)
+- Shows available projects in k8s-template
+- Stashes current changes and saves branch state
+- Checks out master, pulls latest changes
+- Creates a new branch for the feature flag
+- Adds the feature flag to project-specific configuration files:
+  - For non-prod: updates main, ondemand, stage, preprod environments
+  - For prod: updates only prod environment
+- Commits changes and pushes to ttranupgrade remote
+- Creates a pull request with detailed description
+- Restores original branch state and unstashes changes
+
+**Command:** `node PATH_TO_DEV_TOOLS/claude/slash-commands/feature-flag-manager.js`
