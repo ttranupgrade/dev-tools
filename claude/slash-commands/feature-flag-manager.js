@@ -96,7 +96,7 @@ function addFeatureFlagToFile(filePath, featureFlagName) {
 
 // Helper function to get available projects
 function getAvailableProjects() {
-  const applicationsDir = '/Users/ttran/dev/k8s-template/v2/applications';
+  const applicationsDir = 'v2/applications';
   if (!fs.existsSync(applicationsDir)) {
     return [];
   }
@@ -116,10 +116,18 @@ async function main() {
   let stashCreated = false;
 
   try {
+    // Get dev root from environment variable
+    const devRoot = process.env.DEV_ROOT;
+    if (!devRoot) {
+      console.error('DEV_ROOT environment variable not set. Please run the setup script first.');
+      process.exit(1);
+    }
+
     // Navigate to k8s-template directory
-    const k8sTemplatePath = '/Users/ttran/dev/k8s-template';
+    const k8sTemplatePath = path.join(devRoot, 'k8s-template');
     if (!fs.existsSync(k8sTemplatePath)) {
-      console.error('k8s-template directory not found at expected path.');
+      console.error(`k8s-template directory not found at: ${k8sTemplatePath}`);
+      console.error('Please ensure k8s-template is cloned in your dev root directory.');
       process.exit(1);
     }
 
@@ -256,7 +264,20 @@ Co-Authored-By: Claude <noreply@anthropic.com>`;
 
     // Step 9: Push branch and create pull request
     console.log('\n🚀 Pushing branch and creating pull request...');
-    executeCommand(`git push -u origin ${branchName}`);
+    
+    // Try to find a suitable remote for pushing (prefer ttranupgrade, fallback to origin)
+    let pushRemote = 'origin';
+    try {
+      const remotes = executeCommand('git remote', { silent: true }).split('\n').filter(r => r.trim());
+      if (remotes.includes('ttranupgrade')) {
+        pushRemote = 'ttranupgrade';
+      }
+    } catch (error) {
+      // Use default origin if remote command fails
+    }
+    
+    console.log(`📤 Pushing to remote: ${pushRemote}`);
+    executeCommand(`git push -u ${pushRemote} ${branchName}`);
     
     // Create PR using GitHub CLI
     const prTitle = `Add ${featureFlagName} feature flag for ${projectName} (${envType})`;
