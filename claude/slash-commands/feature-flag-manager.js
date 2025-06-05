@@ -288,6 +288,9 @@ async function main() {
     
     // Create PR using GitHub CLI
     const prTitle = `Add ${featureFlagName} feature flag for ${projectName} (${envType})`;
+    
+    // Write PR body to temporary file to avoid shell escaping issues
+    const tmpFile = '/tmp/pr-body.txt';
     const prBody = `## Summary
 - Add \`${featureFlagName}: true\` to ${envType} environment configurations for ${projectName}
 - Updated ${filesUpdated} environment file(s)
@@ -296,11 +299,16 @@ async function main() {
 ${envDirs.map(env => `- ${projectPath}/${env}/values.yaml`).join('\n')}
 
 🤖 Generated with Claude Code`;
-
-    executeCommand(`gh pr create --title "${prTitle}" --body "$(cat <<'EOF'
-${prBody}
-EOF
-)"`);
+    
+    fs.writeFileSync(tmpFile, prBody);
+    executeCommand(`gh pr create --title "${prTitle}" --body-file "${tmpFile}"`);
+    
+    // Clean up temp file
+    try {
+      fs.unlinkSync(tmpFile);
+    } catch (error) {
+      // Ignore cleanup errors
+    }
     
     console.log('\n✅ Pull request created successfully!');
 
