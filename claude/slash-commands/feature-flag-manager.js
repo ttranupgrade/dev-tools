@@ -94,6 +94,38 @@ function addFeatureFlagToFile(filePath, featureFlagName) {
   return true;
 }
 
+// Helper function to remove feature flag from values.yaml file
+function removeFeatureFlagFromFile(filePath, featureFlagName) {
+  if (!fs.existsSync(filePath)) {
+    console.log(`⚠️  File not found: ${filePath}`);
+    return false;
+  }
+
+  console.log(`✏️  Updating ${filePath}...`);
+  
+  // Read the file
+  let content = fs.readFileSync(filePath, 'utf8');
+  
+  // Check if the feature flag exists
+  if (!content.includes(`${featureFlagName}:`)) {
+    console.log(`⚠️  Feature flag ${featureFlagName} not found in ${filePath}`);
+    return false;
+  }
+  
+  // Remove the feature flag line(s)
+  const lines = content.split('\n');
+  const filteredLines = lines.filter(line => {
+    const trimmedLine = line.trim();
+    return !trimmedLine.startsWith(`${featureFlagName}:`) && !trimmedLine.startsWith(`${featureFlagName} :`);
+  });
+  
+  // Write the updated content back to the file
+  const updatedContent = filteredLines.join('\n');
+  fs.writeFileSync(filePath, updatedContent);
+  console.log(`✅ Removed ${featureFlagName} from ${filePath}`);
+  return true;
+}
+
 // Helper function to get available projects
 function getAvailableProjects() {
   const applicationsDir = 'v2/applications';
@@ -144,14 +176,25 @@ async function main() {
       stashCreated = true;
     }
 
-    // Step 1: Ask for feature flag name
-    const featureFlagName = await askQuestion('What is the feature flag name to create? ');
+    // Step 1: Ask for operation type
+    let operation;
+    while (true) {
+      operation = await askQuestion('Do you want to "add" or "remove" a feature flag? ');
+      if (operation === 'add' || operation === 'remove') {
+        break;
+      }
+      console.log('Please enter either "add" or "remove"');
+    }
+
+    // Step 2: Ask for feature flag name
+    const actionWord = operation === 'add' ? 'create' : 'remove';
+    const featureFlagName = await askQuestion(`What is the feature flag name to ${actionWord}? `);
     if (!featureFlagName) {
       console.log('Feature flag name is required. Exiting.');
       process.exit(1);
     }
 
-    // Step 2: Show available projects and ask for project name
+    // Step 3: Show available projects and ask for project name
     const availableProjects = getAvailableProjects();
     if (availableProjects.length > 0) {
       console.log('\n📋 Available projects:');
@@ -182,7 +225,7 @@ async function main() {
       }
     }
 
-    // Step 3: Ask for environment type
+    // Step 4: Ask for environment type
     let envType;
     while (true) {
       envType = await askQuestion('Is this for "prod" or "non-prod" environments? ');
@@ -193,6 +236,7 @@ async function main() {
     }
 
     console.log('\n📋 Summary:');
+    console.log(`Operation: ${operation.toUpperCase()}`);
     console.log(`Feature Flag: ${featureFlagName}`);
     console.log(`Project: ${projectName}`);
     console.log(`Environment Type: ${envType}`);
@@ -223,7 +267,7 @@ async function main() {
     envDirs.forEach(env => console.log(`  - ${projectPath}/${env}/`));
 
     // Step 6: Create a new branch for changes
-    const branchName = `add-${featureFlagName}-${projectName}-${envType}-${Date.now()}`;
+    const branchName = `${operation}-${featureFlagName}-${projectName}-${envType}-${Date.now()}`;
     console.log(`\n🌿 Creating new branch: ${branchName}`);
     executeCommand(`git checkout -b ${branchName}`);
 
@@ -234,14 +278,21 @@ async function main() {
       const envDir = path.join(projectPath, env);
       const valuesFile = path.join(envDir, 'values.yaml');
       
-      // Create directory if it doesn't exist
-      if (!fs.existsSync(envDir)) {
-        console.log(`📁 Creating directory: ${envDir}`);
-        fs.mkdirSync(envDir, { recursive: true });
-      }
-      
-      if (addFeatureFlagToFile(valuesFile, featureFlagName)) {
-        filesUpdated++;
+      if (operation === 'add') {
+        // Create directory if it doesn't exist
+        if (!fs.existsSync(envDir)) {
+          console.log(`📁 Creating directory: ${envDir}`);
+          fs.mkdirSync(envDir, { recursive: true });
+        }
+        
+        if (addFeatureFlagToFile(valuesFile, featureFlagName)) {
+          filesUpdated++;
+        }
+      } else {
+        // Remove operation
+        if (removeFeatureFlagFromFile(valuesFile, featureFlagName)) {
+          filesUpdated++;
+        }
       }
     }
 
@@ -254,7 +305,7 @@ async function main() {
     console.log('\n📦 Committing changes...');
     executeCommand('git add .');
     
-    const commitMessage = `Add ${featureFlagName} feature flag for ${projectName} in ${envType} environments
+    const commitMessage = `${operation === 'add' ? 'Add' : 'Remove'} ${featureFlagName} feature flag for ${projectName} in ${envType} environments
 
 🤖 Generated with Claude Code`;
     
@@ -287,12 +338,12 @@ async function main() {
     executeCommand(`git push -u ${pushRemote} ${branchName}`);
     
     // Create PR using GitHub CLI
-    const prTitle = `Add ${featureFlagName} feature flag for ${projectName} (${envType})`;
+    const prTitle = `${operation === 'add' ? 'Add' : 'Remove'} ${featureFlagName} feature flag for ${projectName} (${envType})`;
     
     // Write PR body to temporary file to avoid shell escaping issues
     const tmpFile = '/tmp/pr-body.txt';
     const prBody = `## Summary
-- Add \`${featureFlagName}: true\` to ${envType} environment configurations for ${projectName}
+- ${operation === 'add' ? `Add \`${featureFlagName}: true\` to` : `Remove \`${featureFlagName}\` from`} ${envType} environment configurations for ${projectName}
 - Updated ${filesUpdated} environment file(s)
 
 ## Environment files updated:
