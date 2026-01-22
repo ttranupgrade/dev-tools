@@ -909,3 +909,278 @@ export default createAgent({
 4. **Additive instructions**: Remember that instructions stack; explicitly override when needed
 5. **Private sandboxing**: Workspaces are private - experiment freely before merging to releases
 
+
+---
+
+# Sierra AI - Agent Quality Guide
+
+## Overview
+
+Quality is fundamental to building production-ready agents. The quality framework serves as both a development guide and release checklist across five interconnected categories:
+
+| Category | Description |
+|----------|-------------|
+| **Behavior** | How the agent behaves, interacts with APIs, and follows rules |
+| **Humanness** | The agent's latency, audio synthesis, and flexibility that make it feel natural |
+| **Brand** | Representation of your organization's brand, tone, and visual identity |
+| **Observability** | Strong monitoring, alerting, and documentation for production reliability |
+| **Maintainability** | Configuration-driven design and comprehensive testing for long-term success |
+
+---
+
+## 1. Behavior
+
+Behavior encompasses how your agent acts, interacts with external systems, and follows defined rules. Well-designed behavior ensures agents handle complex conversations while maintaining accuracy and reliability.
+
+### Start with Goal Agents
+
+**Goal agents** are the most flexible, conversational agents and provide the foundation for building sophisticated, autonomous agents.
+
+**Requirements:**
+- Start with the standard agent template configuration
+- Include `NoCodeJourneysTyped` in your goal agent to enable no-code tools (part of standard template)
+
+### Build Abstracted, Asynchronous APIs
+
+Object models give granular control over expected fields and how they're used within an agent. They define clear interfaces across fragmented APIs.
+
+**API Design Best Practices:**
+
+1. **Design for usage, not plumbing**: Define an interface that matches how you want to use them in journeys, rather than mirroring underlying API calls
+
+2. **Provide a mock API**: Implement a lightweight mock version requiring no network access
+
+3. **Implement a production API**: Ensure the production version aligns with the same interface
+
+4. **Support multiple environments**: Allow the API to switch between staging and production endpoints based on configuration
+
+5. **Inject via context**: Provide the API through context so all dependent components can access it consistently
+
+6. **Toggle with memory variables**: Use a memory variable to control when the mock API is active
+
+7. **Add resilience**: Set timeouts and implement error handling or fallback logic for predictable API errors
+
+8. **Prefer futures (async) over sync calls**: This helps keep agents responsive
+
+9. **Return structured results**: Always return a response or `APIError` object to make error handling predictable and consistent
+
+**Example of well-structured API implementation:**
+
+```typescript
+export class ProductionAPI implements API {
+  function getUser(userId: user): Future<User | APIError> {
+    const responseFuture = fetch.json("https://userapi.com").map(
+      response => {
+        if (isError(response)) {
+          return response;
+        }
+        return response.access_token;
+      });
+  }
+}
+```
+
+### Encode Goal Best Practices
+
+Follow Sierra's detailed best practices guidance for structuring goals, defining conditions, and applying tools effectively.
+
+**Goal Implementation Best Practices:**
+
+1. **Design tools as fully encapsulated capabilities**: Frame each tool around the full outcome it should achieve (e.g., "process a return"), rather than a partial step (e.g., "collect return reason")
+
+2. **Anticipate and document conflicts**: Identify situations where goals, tools, or context may overlap or compete, and make those tradeoffs explicit
+
+---
+
+## 2. Humanness
+
+Humanness makes your agent feel natural, responsive, and easy to interact with. This includes optimizing response times, improving audio quality, and ensuring conversational flexibility.
+
+### Optimize Latency in Voice Agents
+
+Latency is a **key metric** for evaluating voice agents and critical for creating human-like interactions.
+
+**Latency Optimization Strategies:**
+
+- **Combine related tool calls** into a single call where possible (multiple tool calls run sequentially, increasing latency)
+- **Tune knowledge responses** by adjusting parameters such as maximum article count or sufficiency thresholds
+- **Remove unnecessary layers** like extra Tool facades or redundant parameter validations
+- **Gate additional rules and context** using `Conditions` or `when` statements
+- **Eliminate over-used Conditions** (e.g., if a Condition is unlocked in ~95% of conversations, remove it)
+- **Use `useAgentMonitors`** instead of Condition/Outcome skills for intent detection
+- **Pass transfer summaries as parameters** on transfer tool props rather than generating them separately
+
+### Refine Audio Synthesis
+
+- Verify pronunciation of key terms and add synthesis rewrites where needed
+- Define `synthesisRewriteRules` in the `main.tsx` `define` function
+- Leverage synthesis caching if pronunciation issues persist, ensuring verbatim responses are rendered consistently
+
+### Ensure Natural Language
+
+Your agent's phrasing should feel conversational and approachable, avoiding robotic or overly formal patterns.
+
+**Natural Language Best Practices:**
+
+- **Incorporate context into prompts** (e.g., "You mentioned an issue with your order—could you share more about what happened?")
+- **Be prescriptive in word choice and guidance:**
+  - Instruct the agent on **what to say** rather than what **not** to say
+  - Use clear instructions and few-shot examples
+  - Omit redundant intros ("To fix the issue...") and endings ("...Let me know if I can answer more questions!")
+- **Update additional configurations** for progress indicators and individual Tools
+- **Adapt guidance to modality** (chat, voice, email, etc.)
+- **Continuously monitor naturalness** with simulation tests and agent monitors
+
+### Enable Agent Flexibility
+
+Flexible agents adapt dynamically throughout a conversation, unlocking behaviors and transitioning between intents when appropriate.
+
+**Flexibility Best Practices:**
+
+- **Start broad**: Use a top-level goal such as "Determine the reason the customer contacted support"
+- **Avoid unnecessary exits**: Keep the customer within the goal agent whenever possible, except for explicit transfers
+- **Smartly partition intents** to avoid overloading the agent with context
+
+---
+
+## 3. Brand
+
+Brand encompasses how your agent represents your organization's identity, tone, and visual presentation. Consistent brand application ensures your agent feels like a natural extension of your customer experience.
+
+### Apply Tone
+
+Agent tone should be applied consistently across all modalities and validated through testing.
+
+**Tone Best Practices:**
+
+- Define tone guidance in configuration whenever possible
+- **Validate tone with tests** (e.g., "Agent is empathetic when the customer is frustrated")
+- **Apply specific guidance** rather than relying on generic phrases like "Be concise and friendly"
+- **Reference your brand's marketing style guide**
+- **Distill to fundamental principles** into 5–6 bullets for tone and voice guidance
+
+### UI Design
+
+Your agent's user interface should align with your brand and incorporate required legal and compliance elements.
+
+**UI Requirements:**
+
+- Display required disclaimers (e.g., "This chat may be recorded for quality assurance")
+- Match UI colors to the surrounding site or application
+- Render the agent greeting in releases where "start" events are enabled
+
+---
+
+## 4. Observability
+
+Observability ensures your agent can be monitored, debugged, and maintained effectively in production. Strong observability practices help identify issues quickly and maintain reliability.
+
+### Create Reports for Top Metrics
+
+Metrics should be easy to access and track key performance indicators.
+
+**Recommended Metrics:**
+
+- Create a single top-level category that includes:
+  - Total conversations
+  - Resolution rate
+  - CSAT (if available)
+
+### Alert Configuration
+
+**Required Alerts:**
+
+- Trigger alerts for unusual increases in `^unrecoverable-error` tags
+- Trigger alerts for unusual increases in `^sierra-fetch-error` tags
+- Add alerts on failing transfers
+
+---
+
+## 5. Maintainability
+
+Maintainability ensures agents can be updated, debugged, and extended over time. This requires good code organization, comprehensive testing, and clear documentation.
+
+### Code Organization
+
+Agent code should be properly organized and accessible by the right team members.
+
+**Organization Best Practices:**
+
+- Include a `tags.ts` file if you define tags in code to ensure proper tag tracking
+- Use developer (`^[tag]`) tags liberally for automation
+- Use post-conversation hooks to emit tag matches on message content
+- Define all environment variables as string enums in an `env.ts` file
+
+### Prefer Configuration Over Code
+
+Configuration makes business logic more visible, maintainable, and accessible to non-technical stakeholders, reducing reliance on code changes.
+
+### Write Extensive Tests
+
+Comprehensive simulation tests ensure intended behavior and prevent regressions.
+
+**Testing Best Practices:**
+
+- Write simulation tests for **every permutation** of your flow
+- Ensure each test has automated success and failure criteria using tags
+- **Always use the mock API in tests** to guarantee idempotency and reproducibility
+- Mark at least one test as **release-blocking (critical)** for every core flow
+
+Learn more in the **Simulations guide**.
+
+### Write Agent-Specific Documentation
+
+Well-documented agents make onboarding easier and ensure long-term maintainability.
+
+**Documentation Requirements:**
+
+- Describe core agent capabilities and supported journeys
+- Document key APIs the agent interacts with
+
+---
+
+## Next Steps
+
+After completing this quality guide:
+
+1. **Run your quality assessment** - Review the agent live and run automated evaluation prompts
+2. **Prioritize improvements** - Address the most impactful gaps first
+3. **Implement incrementally** - Make changes in manageable, testable batches
+4. **Monitor in production** - Apply observability practices to track performance
+5. **Iterate and improve** - Revisit these standards as your agent grows in complexity and usage
+
+**Remember**: Quality is not a one-time milestone — it's an ongoing process. Regular reviews and improvements will help you maintain high standards as your agent evolves.
+
+---
+
+## Quality Checklist Summary
+
+### ✅ Behavior
+- [ ] Using goal agent foundation with standard template
+- [ ] Included `NoCodeJourneysTyped` for no-code tools
+- [ ] Built abstracted, asynchronous APIs with proper error handling
+- [ ] Tools designed as fully encapsulated capabilities
+- [ ] Documented conflicts and tradeoffs
+
+### ✅ Humanness
+- [ ] Optimized latency (combined tool calls, removed unnecessary layers)
+- [ ] Refined audio synthesis with `synthesisRewriteRules`
+- [ ] Ensured natural, conversational language
+- [ ] Enabled agent flexibility with broad top-level goals
+
+### ✅ Brand
+- [ ] Applied consistent tone across all modalities
+- [ ] Validated tone with tests
+- [ ] UI design matches brand and includes required disclaimers
+- [ ] Referenced brand's marketing style guide
+
+### ✅ Observability
+- [ ] Created reports for top metrics (conversations, resolution rate, CSAT)
+- [ ] Configured alerts for error tags and failing transfers
+
+### ✅ Maintainability
+- [ ] Organized code with `tags.ts` and `env.ts` files
+- [ ] Preferred configuration over code
+- [ ] Written extensive simulation tests with mock APIs
+- [ ] Documented agent capabilities and APIs
+
