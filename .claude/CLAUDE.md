@@ -572,3 +572,340 @@ import {
 } from "@sierra/agent";
 ```
 
+
+---
+
+# Sierra AI Agent SDK - Quick Start Guide
+
+## Development Overview
+
+### Sierra Object Structure
+
+Sierra agents are organized in a hierarchical structure:
+
+- **Organization**: The subdomain where you interact with Sierra (e.g., `upgrade-dev` at https://upgrade-dev.sierra.ai/)
+- **Agent**: A single project within an organization (you can have multiple agents)
+- **Workspace**: A single build of your agent code used for development (remote builds of local code)
+- **Release**: An immutable workspace persisted indefinitely in Sierra; one release is live at a time for end users
+
+### Development Command
+
+Use `pnpm sierra watch` to build and upload local agent code to a workspace. This command:
+- Automatically detects changes in your local filesystem
+- Uploads changes to Sierra servers instantly
+- Provides a private sandbox for experimentation
+
+**Important**: Workspaces are private sandboxes - you can experiment freely without affecting others.
+
+## Setup and Installation
+
+### Required Dependencies
+
+- **Node.js** v20 or later
+- **pnpm** v10 or later
+- **git** v2.45 or later
+
+### Installation Steps
+
+1. **Generate authentication token** via Agent Studio
+2. Add authentication to `.npmrc` in home directory
+3. Navigate to agent root directory (may be in `/agents/base` folder)
+4. Run `pnpm install`
+5. Run `pnpm sierra watch` to connect local code to workspace
+
+## Building Your Agent with createAgent
+
+### Basic Structure
+
+The main agent file is `main.tsx` in the agent directory. Use the `createAgent` method to define your agent:
+
+```typescript
+import { createAgent } from "@sierra/agent/base";
+import { Condition, Glossary, Goal, jsx, ResponsePhrasing, Rule, tools, when } from "@sierra/agent";
+
+export default createAgent({
+  // Configuration goes here
+});
+```
+
+### Brand Configuration
+
+Add branding to customize your agent's identity:
+
+```typescript
+export default createAgent({
+  brand: {
+    agentName: "Floyd",
+    organizationName: "Granite Peak Airlines",
+    customerServiceTeamName: "Floyd's Flight Crew",
+    customerNoun: "flyer",
+  },
+});
+```
+
+## Components and Extensions
+
+### useAdditionalGoalAgentChildren
+
+This property allows you to inject custom behavior into the BaseAgent:
+
+```typescript
+export default createAgent({
+  useAdditionalGoalAgentChildren: () => {
+    return (
+      <>
+        {/* Components go here */}
+      </>
+    );
+  },
+});
+```
+
+### Glossary Component
+
+Define custom knowledge using the `<Glossary>` component:
+
+```typescript
+<Glossary content={`
+  - Peak Explorers: The name of Granite Peak's frequent flyers program
+  - Eagle Crew: The term for Granite Peak's flight attendants
+`} />
+```
+
+### ResponsePhrasing Component
+
+Control your agent's tone and style:
+
+```typescript
+<ResponsePhrasing content={[
+  "You should be fun and breezy! Add some humor and a spirit of adventure!"
+]} />
+```
+
+**Important Note**: Instructions are additive. To change behavior mid-conversation, explicitly tell the agent to ignore previous instructions:
+
+```typescript
+<Condition when={when.observation("The user is discussing a delayed or canceled flight")}>
+  <ResponsePhrasing content={[
+    "Don't be fun or humorous. Take a more serious and empathetic tone."
+  ]} />
+</Condition>
+```
+
+## Tools
+
+### Registering Tools with registerTool
+
+**Recommended approach** for creating tools that work in both code and Agent Studio:
+
+```typescript
+const FlightLookupTool = tools.registerTool({
+  type: "lookup",
+  name: "flightStatusLookup",
+  description: "Lookup the status of a flight by flight number",
+  noCodeId: "flightStatusLookup",
+  params: {
+    flightNumber: {
+      type: "string",
+      description: "The flight number to lookup",
+    },
+  },
+  func: (_, params, controls) => {
+    const fakeData = {
+      flightNumber: params.flightNumber,
+      startAirport: "LAX",
+      endAirport: "SFO",
+      status: "On time",
+      // ... more data
+    };
+    return controls.result({ data: JSON.stringify(fakeData) });
+  },
+});
+```
+
+**Key points:**
+- Use `registerTool` instead of `<LookupTool>` or `<ActionTool>` components when possible
+- Tools can be referenced both in code and Agent Studio
+- Include readable names and accurate descriptions
+- Tool returns should be easy to understand
+
+### Agent Intelligence with Tool Parameters
+
+**Automatic parameter collection**: The agent automatically knows what parameters are needed to call tools by reading their descriptions. You don't need to explicitly instruct the agent to ask for missing parameters.
+
+## Conditions and Goals
+
+### Goal-Based Journeys
+
+Use `<Condition>` to control when tools and goals are revealed to the agent:
+
+```typescript
+<Condition when={when.observation("The user is asking about the status of a flight")}>
+  <Goal description="Lookup the status of a flight by flight number and report it back to the user">
+    <FlightLookupTool />
+  </Goal>
+</Condition>
+```
+
+**Benefits:**
+- Only provides relevant tools for the current context
+- Reduces cognitive load on the agent
+- Same concept as creating journeys in Agent Studio
+
+## Event Handling
+
+### onClientEvent Handler
+
+React to events triggered by the chat client:
+
+```typescript
+export default createAgent({
+  config: {
+    textConfig: {
+      enabledEvents: ["inactivity"],
+      inactivityTimeoutSeconds: 60,
+    },
+  },
+  onClientEvent: (props, next) => {
+    const { event, conversation } = props;
+    switch (event.type) {
+      case "inactivity":
+        conversation.output.send({
+          type: "message",
+          message: {
+            role: "assistant",
+            content: "Are you still there? I'm ready to help!"
+          }
+        });
+        next(props); // Optional: defer to normal agent behavior
+        break;
+      default:
+        next(props); // Handle all other events normally
+        break;
+    }
+  },
+});
+```
+
+**Common events:**
+- `inactivity`: User hasn't replied after a timeout
+- Agent startup
+- User leaving chat
+- User sending a message
+
+**Testing events in Dev Chat:**
+- Click the three-dot menu above send button
+- Select "Send inactivity event" to manually trigger
+
+## Complete Agent Example
+
+```typescript
+import { createAgent } from "@sierra/agent/base";
+import integrationsRegistry from "./integrations-registry";
+import { Condition, Glossary, Goal, jsx, ResponsePhrasing, Rule, tools, when } from "@sierra/agent";
+
+const FlightLookupTool = tools.registerTool({
+  type: "lookup",
+  name: "flightStatusLookup",
+  description: "Lookup the status of a flight by flight number",
+  noCodeId: "flightStatusLookup",
+  params: {
+    flightNumber: {
+      type: "string",
+      description: "The flight number to lookup",
+    },
+  },
+  func: (_, params, controls) => {
+    const fakeData = {
+      flightNumber: params.flightNumber,
+      startAirport: "LAX",
+      endAirport: "SFO",
+      status: "On time",
+      departureTime: "10:00 AM",
+      arrivalTime: "12:00 PM",
+      duration: "2 hours",
+      aircraft: "Boeing 747",
+      departureGate: "10",
+      departureTerminal: "1",
+      arrivalGate: "Unknown",
+    };
+    return controls.result({ data: fakeData });
+  },
+});
+
+export default createAgent({
+  config: {
+    textConfig: {
+      enabledEvents: ["inactivity"],
+      inactivityTimeoutSeconds: 60,
+    },
+  },
+  brand: {
+    agentName: "Floyd",
+    organizationName: "Granite Peak Airlines",
+    customerServiceTeamName: "Floyd's Flight Crew",
+    customerNoun: "flyer",
+  },
+  useAdditionalGoalAgentChildren: () => {
+    return (
+      <>
+        <ResponsePhrasing content={[
+          "You should be fun and breezy! Add some humor and a spirit of adventure!"
+        ]} />
+        
+        <Glossary content={`
+          - Peak Explorers: The name of Granite Peak's frequent flyers program
+          - Eagle Crew: The term for Granite Peak's flight attendants
+        `} />
+        
+        <Condition when={when.observation("The user is asking about the status of a flight")}>
+          <Goal description="Lookup the status of a flight by flight number and report it back to the user">
+            <FlightLookupTool />
+          </Goal>
+        </Condition>
+        
+        <Condition when={when.observation("The user is discussing a delayed or canceled flight")}>
+          <ResponsePhrasing content={[
+            "Don't be fun or humorous. Take a more serious and empathetic tone."
+          ]} />
+        </Condition>
+      </>
+    );
+  },
+  onClientEvent: (props, next) => {
+    const { event, conversation } = props;
+    switch (event.type) {
+      case "inactivity":
+        conversation.output.send({
+          type: "message",
+          message: {
+            role: "assistant",
+            content: "Are you still there? I'm ready to help!"
+          }
+        });
+        next(props);
+        break;
+      default:
+        next(props);
+        break;
+    }
+  },
+  integrationsRegistry,
+});
+```
+
+## Testing Your Agent
+
+1. Visit Agent Studio at https://upgrade-dev.sierra.ai/
+2. Navigate to **Dev Chat**
+3. Test conversations with your agent
+4. Use three-dot menu to manually trigger events (e.g., inactivity)
+
+## Best Practices
+
+1. **Provide context, not instructions**: Give agents tools and information they need without overloading them
+2. **Use Conditions wisely**: Only reveal relevant tools/goals for the current conversation context
+3. **Clear descriptions**: Tool names, descriptions, and parameters should be readable and accurate
+4. **Additive instructions**: Remember that instructions stack; explicitly override when needed
+5. **Private sandboxing**: Workspaces are private - experiment freely before merging to releases
+
