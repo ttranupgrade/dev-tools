@@ -157,10 +157,24 @@ const { i18n } = useLingui();
 
 // Numbers
 i18n.number(123.45)
-
-// Currencies
-i18n.number(amount, { style: 'currency', currency: 'USD' })
 ```
+
+**Currencies:**
+
+Use the `formatPrice` utility from `@upgrade/ui-utils/formatters/lingui/price`:
+
+```javascript
+import formatPrice from '@upgrade/ui-utils/formatters/lingui/price';
+
+const PaymentDue = ({ amount }) => {
+  return <span>{formatPrice(amount)}</span>
+};
+```
+
+This is preferred over using `i18n.number()` directly because:
+- Simpler (no need to import `useLingui()`)
+- Consistent with codebase patterns
+- Currency configuration is handled internally
 
 ## Dates
 
@@ -171,7 +185,9 @@ import formatDate from '@upgrade/ui-utils/formatters/date-local';
 <span>{formatDate(date)}</span>
 ```
 
-## Common Mistake to Avoid
+## Common Mistakes to Avoid
+
+### 1. Splitting strings into multiple translations
 
 ❌ **Bad** - Splits strings into multiple translations:
 ```javascript
@@ -188,6 +204,34 @@ import formatDate from '@upgrade/ui-utils/formatters/date-local';
   <a href="/legal">financial technology company</a>
 </Trans>
 ```
+
+### 2. Using expressions inside Trans components
+
+❌ **Bad** - Ternary or other expressions inside `<Trans>`:
+```javascript
+<Trans>
+  This payment of {amount} will satisfy your payment.
+  {nextDueDate ? (
+    <> Your next payment will be on {nextDueDate}.</>
+  ) : null}
+  Any excess will be applied to principal.
+</Trans>
+```
+
+✅ **Good** - Move conditional outside `<Trans>`, use separate Trans for each variant:
+```javascript
+{nextDueDate ? (
+  <Trans>
+    This payment of {amount} will satisfy your payment. Your next payment will be on {nextDueDate}. Any excess will be applied to principal.
+  </Trans>
+) : (
+  <Trans>
+    This payment of {amount} will satisfy your payment. Any excess will be applied to principal.
+  </Trans>
+)}
+```
+
+**Why?** Lingui's `no-expression-in-message` rule doesn't allow ternary operators, function calls, or other expressions inside `<Trans>`. This ensures translators get complete, unambiguous strings to translate. Variables (like `{amount}`) are allowed, but not expressions that change the string structure.
 
 ## Code Review Best Practices (from PR #6783)
 
@@ -1183,4 +1227,274 @@ After completing this quality guide:
 - [ ] Preferred configuration over code
 - [ ] Written extensive simulation tests with mock APIs
 - [ ] Documented agent capabilities and APIs
+
+
+---
+
+# Migrating to Typography Components (@upgrade/react-components)
+
+## Overview
+
+To fix the eslint rule `@upgrade/no-jsx-legacy-text-classes`, migrate from legacy text classes to Typography components from `@upgrade/react-components`.
+
+## Migration Patterns
+
+### 1. Heading Tags (h1, h2, h3, etc.) → `<Heading>`
+
+**Before:**
+```javascript
+import { Modal } from '@upgrade/react-components';
+
+<Modal>
+  <h3>
+    <Trans>Add a Bank Account</Trans>
+  </h3>
+</Modal>
+```
+
+**After:**
+```javascript
+import { Modal, Heading } from '@upgrade/react-components';
+
+<Modal>
+  <Heading as="h3">
+    <Trans>Add a Bank Account</Trans>
+  </Heading>
+</Modal>
+```
+
+**Key points:**
+- Import `Heading` from `@upgrade/react-components`
+- Use `as` prop to specify the underlying HTML element (h1, h2, h3, h4, h5, h6)
+- Wrap existing content with `<Heading>` component
+
+### 2. Bold Text (`className="text--weight-bold"`) → `<Text bold>`
+
+**Before:**
+```javascript
+<p className="text--weight-bold">
+  <Trans>
+    Upgrade, Inc.
+    <br />
+    P.O. Box 543210
+  </Trans>
+</p>
+```
+
+**After:**
+```javascript
+import { Text } from '@upgrade/react-components';
+
+<Text as="p" bold>
+  <Trans>
+    Upgrade, Inc.
+    <br />
+    P.O. Box 543210
+  </Trans>
+</Text>
+```
+
+**Key points:**
+- Import `Text` from `@upgrade/react-components`
+- Use `as` prop to specify the underlying HTML element (p, span, div, etc.)
+- Use `bold` prop instead of `className="text--weight-bold"`
+
+### 3. Legal Text (`className="text--legal"`) → `<LegalText>`
+
+**Before:**
+```javascript
+<div className="text--legal">
+  <Trans>
+    *The payoff amount is based on the accrued interest and fees up to the selected Payoff Date. Any overage
+    resulting from this payoff will be refunded within 15 days via ACH. For any questions, give us a call at{' '}
+    <SupportPhoneNumber department={ACCOUNT_SERVICING} />, <SupportHours inline department={ACCOUNT_SERVICING} />.
+  </Trans>
+</div>
+```
+
+**After:**
+```javascript
+import { LegalText } from '@upgrade/react-components';
+
+<LegalText as="div">
+  <Trans>
+    *The payoff amount is based on the accrued interest and fees up to the selected Payoff Date. Any overage
+    resulting from this payoff will be refunded within 15 days via ACH. For any questions, give us a call at{' '}
+    <SupportPhoneNumber department={ACCOUNT_SERVICING} />, <SupportHours inline department={ACCOUNT_SERVICING} />.
+  </Trans>
+</LegalText>
+```
+
+**Key points:**
+- Import `LegalText` from `@upgrade/react-components`
+- Use `as` prop to specify the underlying HTML element (div, p, span, etc.)
+- Replace `className="text--legal"` with `<LegalText>` component
+
+## Common Typography Components
+
+| Legacy Pattern | Component | Props |
+|----------------|-----------|-------|
+| `<h1>`, `<h2>`, `<h3>`, etc. | `<Heading>` | `as="h1"` through `as="h6"` |
+| `className="text--weight-bold"` | `<Text>` | `bold` |
+| `className="text--legal"` | `<LegalText>` | `as="div"` or `as="p"` |
+
+## Import Pattern
+
+Always import Typography components from `@upgrade/react-components`:
+
+```javascript
+import { Heading, Text, LegalText } from '@upgrade/react-components';
+```
+
+## Snapshot Test Updates
+
+When migrating to Typography components, snapshot tests will need to be updated to reflect the new component structure.
+
+**Example snapshot change:**
+```diff
+-  <h3>
++  <Heading
++    as="h3"
++  >
+     Add a Bank Account
+-  </h3>
++  </Heading>
+```
+
+Run `yarn test -u` to update snapshots after making Typography component migrations.
+
+
+---
+
+# Migrating to Typography Components (@upgrade/react-components)
+
+## Overview
+
+To fix the eslint rule `@upgrade/no-jsx-legacy-text-classes`, migrate from legacy text classes to Typography components from `@upgrade/react-components`.
+
+## Migration Patterns
+
+### 1. Heading Tags (h1, h2, h3, etc.) → `<Heading>`
+
+**Before:**
+```javascript
+import { Modal } from '@upgrade/react-components';
+
+<Modal>
+  <h3>
+    <Trans>Add a Bank Account</Trans>
+  </h3>
+</Modal>
+```
+
+**After:**
+```javascript
+import { Modal, Heading } from '@upgrade/react-components';
+
+<Modal>
+  <Heading as="h3">
+    <Trans>Add a Bank Account</Trans>
+  </Heading>
+</Modal>
+```
+
+**Key points:**
+- Import `Heading` from `@upgrade/react-components`
+- Use `as` prop to specify the underlying HTML element (h1, h2, h3, h4, h5, h6)
+- Wrap existing content with `<Heading>` component
+
+### 2. Bold Text (`className="text--weight-bold"`) → `<Text bold>`
+
+**Before:**
+```javascript
+<p className="text--weight-bold">
+  <Trans>
+    Upgrade, Inc.
+    <br />
+    P.O. Box 543210
+  </Trans>
+</p>
+```
+
+**After:**
+```javascript
+import { Text } from '@upgrade/react-components';
+
+<Text as="p" bold>
+  <Trans>
+    Upgrade, Inc.
+    <br />
+    P.O. Box 543210
+  </Trans>
+</Text>
+```
+
+**Key points:**
+- Import `Text` from `@upgrade/react-components`
+- Use `as` prop to specify the underlying HTML element (p, span, div, etc.)
+- Use `bold` prop instead of `className="text--weight-bold"`
+
+### 3. Legal Text (`className="text--legal"`) → `<LegalText>`
+
+**Before:**
+```javascript
+<div className="text--legal">
+  <Trans>
+    *The payoff amount is based on the accrued interest and fees up to the selected Payoff Date. Any overage
+    resulting from this payoff will be refunded within 15 days via ACH. For any questions, give us a call at{' '}
+    <SupportPhoneNumber department={ACCOUNT_SERVICING} />, <SupportHours inline department={ACCOUNT_SERVICING} />.
+  </Trans>
+</div>
+```
+
+**After:**
+```javascript
+import { LegalText } from '@upgrade/react-components';
+
+<LegalText as="div">
+  <Trans>
+    *The payoff amount is based on the accrued interest and fees up to the selected Payoff Date. Any overage
+    resulting from this payoff will be refunded within 15 days via ACH. For any questions, give us a call at{' '}
+    <SupportPhoneNumber department={ACCOUNT_SERVICING} />, <SupportHours inline department={ACCOUNT_SERVICING} />.
+  </Trans>
+</LegalText>
+```
+
+**Key points:**
+- Import `LegalText` from `@upgrade/react-components`
+- Use `as` prop to specify the underlying HTML element (div, p, span, etc.)
+- Replace `className="text--legal"` with `<LegalText>` component
+
+## Common Typography Components
+
+| Legacy Pattern | Component | Props |
+|----------------|-----------|-------|
+| `<h1>`, `<h2>`, `<h3>`, etc. | `<Heading>` | `as="h1"` through `as="h6"` |
+| `className="text--weight-bold"` | `<Text>` | `bold` |
+| `className="text--legal"` | `<LegalText>` | `as="div"` or `as="p"` |
+
+## Import Pattern
+
+Always import Typography components from `@upgrade/react-components`:
+
+```javascript
+import { Heading, Text, LegalText } from '@upgrade/react-components';
+```
+
+## Snapshot Test Updates
+
+When migrating to Typography components, snapshot tests will need to be updated to reflect the new component structure.
+
+**Example snapshot change:**
+```diff
+-  <h3>
++  <Heading
++    as="h3"
++  >
+     Add a Bank Account
+-  </h3>
++  </Heading>
+```
+
+Run `yarn test -u` to update snapshots after making Typography component migrations.
 
