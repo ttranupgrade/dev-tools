@@ -1,8 +1,8 @@
-# Deployment PR Analyzer
+# Prepare Production Deployment PR
 
-**Description:** Extracts all pull request URLs from a k8s-template deployment pull request.
+**Description:** Prepares a k8s-template production deployment PR by extracting related PRs, adding JIRA tickets, adding QA reviewers, and generating a summary.
 
-**Usage:** When the user provides a k8s-template PR URL (e.g., `https://github.com/Credify/k8s-template/pull/208945`), analyze the deployment and output a list of all GitHub pull request URLs that are included in that deployment.
+**Usage:** When the user provides a k8s-template PR URL (e.g., `https://github.com/Credify/k8s-template/pull/208945`), this skill will analyze the deployment, update the PR description with JIRA tickets, add QA reviewers, and output a formatted summary with all related PRs and their authors/QA approvers.
 
 ---
 
